@@ -1,0 +1,92 @@
+---
+title: "Stat 432 Homework 2 Solution"
+date: "Assigned: Aug 29, 2022; <span style='color:red'>Due: 11:59 PM CT, Sep 15, 2022</span>"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '2'
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{css, echo=FALSE}
+.solution {
+background-color: #CCDDFF;
+}
+```
+
+## Instruction
+
+```{r}
+library("tidyverse")
+spaceship = read.csv("spaceshiptrain.csv")
+spaceship = as_tibble(spaceship)
+
+```
+```{r}
+library("tidyverse")
+# removing useless variables
+# we should parse passenger_Id into group, since the id by itself is useless, but data about the group metadata might be useful(size of group they're in?)
+
+# get_group_size =
+split_passenger_id = function(spaceship) {
+  
+}
+
+
+spaceship = spaceship %>% 
+  select(-one_of("Name")) %>% drop_na
+
+```  
+```{r}
+# split up passengerID(ex ->"1234-01") into group_id ("1234") and pers_id ("01). Also splits up cabin(ex-> "F/226/P") int Deck("F"), Num(226) and Side("P")
+split_passenger_and_cabin = function(spaceship) {
+  spaceship = spaceship %>% 
+  mutate(
+    Group_id = strtoi(substr(PassengerId, 1, 4), base=10L),
+    Pers_id = strtoi(substr(PassengerId, 6, 7), base=10L),
+    Deck = substr(Cabin, 1, 1),
+    Num = strtoi(substr(Cabin, 3, 5), base=10L),
+    Side = substr(Cabin, -1, -1)
+  )
+  spaceship
+}
+spaceship_2 = spaceship %>% split_passenger_and_cabin
+
+
+``` 
+```{r}
+# find size of group that each person is traveling in
+add_group_size = function(spaceship) {
+  spaceship = spaceship %>% 
+  group_by(group_id) %>%
+  mutate(
+    group_size = max(pers_id)
+  )
+  spaceship
+}
+
+```
+```{r}
+# save processed data to csv file.
+spaceship_2 = read.csv("spaceshiptrain_processed.csv")
+
+```
+
+```{r}
+# save processed data to csv file.
+spaceship_processed = spaceship %>% 
+  split_passenger_and_cabin %>%
+  add_group_size
+
+write.csv(spaceship_processed, "spaceshiptrain_processed.csv", row.names= FALSE)
+
+```
+  
