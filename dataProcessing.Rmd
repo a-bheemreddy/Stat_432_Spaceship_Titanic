@@ -112,11 +112,11 @@ handle_cryo_sleep = function(spaceship) {
   # spaceship
   spaceship = spaceship %>%
     mutate(
-         RoomService = ifelse(is.na(RoomService) & CryoSleep == TRUE, 0, RoomService),
-         FoodCourt = ifelse(is.na(FoodCourt) & CryoSleep == TRUE, 0, FoodCourt),
-         ShoppingMall = ifelse(is.na(ShoppingMall) & CryoSleep == TRUE, 0, ShoppingMall),
-         Spa = ifelse(is.na(Spa) & CryoSleep == TRUE, 0, Spa),
-         VRDeck = ifelse(is.na(VRDeck) & CryoSleep == TRUE, 0, VRDeck),
+         RoomService = ifelse(is.na(RoomService) & CryoSleep == "True", 0, RoomService),
+         FoodCourt = ifelse(is.na(FoodCourt) & CryoSleep == "True", 0, FoodCourt),
+         ShoppingMall = ifelse(is.na(ShoppingMall) & CryoSleep == "True", 0, ShoppingMall),
+         Spa = ifelse(is.na(Spa & CryoSleep == "True"), 0, Spa),
+         VRDeck = ifelse(is.na(VRDeck) & CryoSleep == "True", 0, VRDeck),
          extra_col = VRDeck
            )
 }
