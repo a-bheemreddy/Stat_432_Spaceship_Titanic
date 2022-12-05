@@ -40,7 +40,7 @@ split_passenger_id = function(spaceship) {
   
 }
 
-remove_rownames = function(names) {
+remove_cols = function(spaceship, names) {
   spaceship = spaceship %>% 
     select(-one_of(names)) %>% drop_na
 }
@@ -57,7 +57,8 @@ split_passenger_and_cabin = function(spaceship) {
     Deck = substr(Cabin, 1, 1),
     Num = as.numeric(str_sub(Cabin, 3, -3)),
     Side = str_sub(Cabin, -1, -1)
-  )
+  ) %>%
+  remove_cols(c("PassengerId", "Cabin", "Name"))
   spaceship
 }
 
@@ -74,7 +75,8 @@ add_group_size = function(spaceship) {
     Group_size = max(Pers_id)
   )
   spaceship %>%
-  ungroup()
+  ungroup() %>%
+  remove_cols(c("Pers_id"))
 }
 
 ```
@@ -116,9 +118,8 @@ handle_cryo_sleep = function(spaceship) {
          FoodCourt = ifelse(is.na(FoodCourt) & CryoSleep == "True", 0, FoodCourt),
          ShoppingMall = ifelse(is.na(ShoppingMall) & CryoSleep == "True", 0, ShoppingMall),
          Spa = ifelse(is.na(Spa & CryoSleep == "True"), 0, Spa),
-         VRDeck = ifelse(is.na(VRDeck) & CryoSleep == "True", 0, VRDeck),
-         extra_col = VRDeck
-           )
+         VRDeck = ifelse(is.na(VRDeck) & CryoSleep == "True", 0, VRDeck)
+         )
 }
 
 spaceship_2 = spaceship %>% 
@@ -175,11 +176,6 @@ spaceship_2 = spaceship %>%
 
 ```
 ```{r}
-# save processed data to csv file.
-spaceship_2 = read.csv("spaceshiptrain_processed.csv")
-
-```
-```{r}
 library(mice)
 # use mice to fill in spending collumns
 fill_in_spending_nulls_with_mice = function(spaceship) {
@@ -197,29 +193,19 @@ fill_in_spending_nulls_with_mice = function(spaceship) {
   # replace in full df
   print(head(final_clean_amenity_df[,1:5]))
   spaceship[,6:10] = final_clean_amenity_df[,1:5]
-  # spaceship%>%
-  # mutate
-  # (
-  #   RoomService = final_clean_amenity_df[ ,1],
-  #   FoodCourt = final_clean_amenity_df[,2],
-  #   ShoppingMall = final_clean_amenity_df[,3],
-  #   Spa = final_clean_amenity_df[,4],
-  #   VRDeck = final_clean_amenity_df[,5]
-  # )
+  spaceship
   
 }
-
-spaceship_2 = spaceship %>% 
-  split_passenger_and_cabin %>% 
-  add_group_size %>%
-  handle_null_planet %>%
-  fill_nulls_with_mode %>%
-  fill_age_with_lm %>%
-  fill_in_spending_nulls_with_mice
-  
-
-
-
+```
+```{r}
+# save processed data to csv file.
+combine_spending_cols = function(spaceship) {
+  spaceship %>% 
+  mutate(
+    TotalSpent = FoodCourt + RoomService + ShoppingMall + Spa + VRDeck
+  ) %>%
+  remove_cols(c("RoomService", "ShoppingMall", "Spa", "VRDeck", "FoodCourt" ))
+}
 
 ```
 
@@ -228,7 +214,13 @@ spaceship_2 = spaceship %>%
 spaceship_processed = spaceship %>% 
   split_passenger_and_cabin %>%
   add_group_size %>%
-  handle_null_planet
+  handle_null_planet %>%
+  handle_cryo_sleep %>%
+  fill_nulls_with_mode %>%
+  fill_age_with_lm %>%
+  fill_in_spending_nulls_with_mice %>%
+  combine_spending_cols
+  
 write.csv(spaceship_processed, "spaceshiptrain_processed.csv", row.names= FALSE)
 
 ```
