@@ -40,9 +40,11 @@ split_passenger_id = function(spaceship) {
   
 }
 
+remove_rownames = function(names) {
+  spaceship = spaceship %>% 
+    select(-one_of(names)) %>% drop_na
+}
 
-spaceship = spaceship %>% 
-  select(-one_of("Name")) %>% drop_na
 
 ```  
 ```{r}
