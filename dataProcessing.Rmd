@@ -55,11 +55,12 @@ split_passenger_and_cabin = function(spaceship) {
     Group_id = strtoi(substr(PassengerId, 1, 4), base=10L),
     Pers_id = strtoi(substr(PassengerId, 6, 7), base=10L),
     Deck = substr(Cabin, 1, 1),
-    Num = strtoi(substr(Cabin, 3, 5), base=10L),
-    Side = substr(Cabin, -1, -1)
+    Num = as.numeric(str_sub(Cabin, 3, -3)),
+    Side = str_sub(Cabin, -1, -1)
   )
   spaceship
 }
+
 spaceship_2 = spaceship %>% split_passenger_and_cabin
 
 
@@ -68,12 +69,109 @@ spaceship_2 = spaceship %>% split_passenger_and_cabin
 # find size of group that each person is traveling in
 add_group_size = function(spaceship) {
   spaceship = spaceship %>% 
-  group_by(group_id) %>%
+  group_by(Group_id) %>%
   mutate(
-    group_size = max(pers_id)
+    Group_size = max(Pers_id)
   )
+  spaceship %>%
+  ungroup()
+}
+
+```
+```{r}
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+# sets null planet values to most commmon planet in group
+handle_null_planet = function(spaceship) {
+  spaceship = spaceship %>% 
+  group_by(Group_id) %>%
+  mutate(
+    HomePlanet = ifelse(HomePlanet == "", NA, HomePlanet),
+    Destination = ifelse(Destination == "", NA, Destination),
+    Deck = ifelse(Deck == "", NA, Deck)
+  ) %>%
+  mutate(
+    HomePlanet = replace_na(HomePlanet, getmode(HomePlanet)),
+    Destination = replace_na(Destination, getmode(Destination)),
+    Deck = replace_na(Deck, getmode(Deck))
+  ) %>%
+  ungroup()
+  
+}
+```
+```{r}
+
+handle_cryo_sleep = function(spaceship) {
+  # spaceship = spaceship %>% 
+  #   mutate(
+  #     Spa = ifelse(is.na(Spa) & CryoSleep == TRUE, 0, Spa),
+  #     FoodCourt = ifelse(is.na(FoodCourt) & CryoSleep == TRUE, 0, FoodCourt),
+  #   )
+  # spaceship
+  spaceship = spaceship %>%
+    mutate(
+         RoomService = ifelse(is.na(RoomService) & CryoSleep == TRUE, 0, RoomService),
+         FoodCourt = ifelse(is.na(FoodCourt) & CryoSleep == TRUE, 0, FoodCourt),
+         ShoppingMall = ifelse(is.na(ShoppingMall) & CryoSleep == TRUE, 0, ShoppingMall),
+         Spa = ifelse(is.na(Spa) & CryoSleep == TRUE, 0, Spa),
+         VRDeck = ifelse(is.na(VRDeck) & CryoSleep == TRUE, 0, VRDeck),
+         extra_col = VRDeck
+           )
+}
+
+spaceship_2 = spaceship %>% 
+  handle_cryo_sleep
+
+na_prop = function(vec){
+  sum(is.na(vec)) / length(vec)
+}
+
+```
+```{r}
+# Fill in Nulls with Mode
+fill_nulls_with_mode = function(spaceship) {
+  spaceship %>%
+  ungroup() %>%
+  mutate(
+    HomePlanet = ifelse(HomePlanet == "", NA, HomePlanet),
+    Destination = ifelse(Destination == "", NA, Destination),
+    Deck = ifelse(Deck == "", NA, Deck),
+    Side = ifelse(Side == "", NA, Side),
+    CryoSleep = ifelse(CryoSleep == "", NA, CryoSleep),
+    VIP = ifelse(VIP == "", NA, VIP)
+    
+  ) %>%
+  mutate(
+    HomePlanet = replace_na(HomePlanet, getmode(HomePlanet)),
+    Destination = replace_na(Destination, getmode(Destination)),
+    Deck = replace_na(Deck, getmode(Deck)),
+    Side = replace_na(Side, getmode(Side)),
+    CryoSleep = replace_na(CryoSleep, getmode(CryoSleep)),
+    VIP = replace_na(VIP, getmode(VIP))
+  ) 
+}
+spaceship_2 = spaceship %>% 
+  split_passenger_and_cabin %>% 
+  handle_null_planet %>%
+  fill_nulls_with_mode
+```
+```{r}
+fill_age_with_lm = function(spaceship) {
+  model = lm(Age ~ VIP + Group_size + HomePlanet + Destination + Deck, data = spaceship)
+  # add predicted age instead of null values.
+  spaceship_age_na = spaceship %>% filter(is.na(Age))
+  spaceship$Age[is.na(spaceship$Age)] = predict(model, spaceship_age_na)
   spaceship
 }
+
+spaceship_2 = spaceship %>% 
+  split_passenger_and_cabin %>% 
+  add_group_size %>%
+  handle_null_planet %>%
+  fill_nulls_with_mode %>%
+  fill_age_with_lm
 
 ```
 ```{r}
@@ -81,13 +179,56 @@ add_group_size = function(spaceship) {
 spaceship_2 = read.csv("spaceshiptrain_processed.csv")
 
 ```
+```{r}
+library(mice)
+# use mice to fill in spending collumns
+fill_in_spending_nulls_with_mice = function(spaceship) {
+    spaceship_subset = spaceship %>% 
+    select(RoomService, FoodCourt, ShoppingMall, Spa, VRDeck, VIP, Age, Side, Deck, Group_size)
+    
+    spending_mice =  mice(spaceship_subset, method = c(rep("pmm", 5), rep("", 5)), maxit = 20)
+    
+    # check which dataset you want to use
+  #spending_mice$imp$RoomService
+  
+  # impute new data
+  final_clean_amenity_df = complete(spending_mice, 1)
+  
+  # replace in full df
+  print(head(final_clean_amenity_df[,1:5]))
+  spaceship[,6:10] = final_clean_amenity_df[,1:5]
+  # spaceship%>%
+  # mutate
+  # (
+  #   RoomService = final_clean_amenity_df[ ,1],
+  #   FoodCourt = final_clean_amenity_df[,2],
+  #   ShoppingMall = final_clean_amenity_df[,3],
+  #   Spa = final_clean_amenity_df[,4],
+  #   VRDeck = final_clean_amenity_df[,5]
+  # )
+  
+}
+
+spaceship_2 = spaceship %>% 
+  split_passenger_and_cabin %>% 
+  add_group_size %>%
+  handle_null_planet %>%
+  fill_nulls_with_mode %>%
+  fill_age_with_lm %>%
+  fill_in_spending_nulls_with_mice
+  
+
+
+
+
+```
 
 ```{r}
 # save processed data to csv file.
 spaceship_processed = spaceship %>% 
   split_passenger_and_cabin %>%
-  add_group_size
-
+  add_group_size %>%
+  handle_null_planet
 write.csv(spaceship_processed, "spaceshiptrain_processed.csv", row.names= FALSE)
 
 ```
