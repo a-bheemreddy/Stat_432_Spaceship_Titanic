@@ -80,23 +80,72 @@ test_accuracy(knn1_cv1)
 ```{r}
 rfe_ctrl <- rfeControl(functions = rfFuncs, # random forest
                       method = "repeatedcv", # repeated cv
-                      repeats = 5, # number of repeats
-                      number = 10) # number of folds
+                      repeats = 3, # number of repeats
+                      number = 5) # number of folds
 
-x = 
+x_train = train %>% remove_cols(c("Transported")) # the remove_cols function is in dataProcessing.Rmd
+y_train = train$Transported
 ```
+
+```{r}
+result_rfe = rfe(x = x_train, 
+                  y = y_train, 
+                  sizes = c(1:12),
+                  rfeControl = rfe_ctrl)
+result_rfe
+```
+```{r}
+ggplot(data = result_rfe, metric = "Accuracy") + theme_bw()
+ggplot(data = result_rfe, metric = "Kappa") + theme_bw()
+```
+
+```{r}
+library(ranger)
+rf_grid = expand.grid(mtry = c(1, 3, 5), splitrule = c("gini"), min.node.size = c(5, 10, 20))
+
+trcontrol = trainControl(method = "repeatedcv", number = 5, repeats = 3)
+
+models = train(Transported ~ , data = train, method = "ranger", trControl = trcontrol, tuneGrid = rf_grid, num.trees = 300, respect.unordered.factors = "partition")
+
+
+```
+
 ```{r}
 library(caret)
 # random forest
+rf_grid = expand.grid(mtry = c(1, 3), splitrule = c("gini"), min.node.size = c(5, 10, 20))
+
 rf_model = train(form = Transported ~ .,
                 data = train,
                 method = 'rf',
                 trControl = cv,
-                verbose = FALSE)
+                tuneGrid = rf_grid,
+                verbose = FALSE,
+                importance = TRUE)
 
 # evaluate rf2
 test_accuracy(rf_model)
 
+
+```
+```{r}
+library(varImp)
+i_scores <- varImp(rf_model$finalModel, conditional=TRUE)
+#Gathering rownames in 'var'  and converting it to the factor
+#to provide 'fill' parameter for the bar chart. 
+i_scores <- i_scores %>% tibble::rownames_to_column("var") 
+i_scores$var<- i_scores$var %>% as.factor()
+#Plotting the bar and polar charts for comparing variables
+i_bar <- ggplot(data = i_scores) + 
+  geom_bar(
+    stat = "identity",#it leaves the data without count and bin
+    mapping = aes(x = var, y=Overall, fill = var), 
+    show.legend = FALSE,
+    width = 1
+  ) + 
+  labs(x = NULL, y = NULL)
+i_bar + coord_polar() + theme_minimal()
+i_bar + coord_flip() + theme_minimal()
 
 ```
   
