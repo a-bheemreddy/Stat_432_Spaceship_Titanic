@@ -1,0 +1,102 @@
+---
+title: "Stat 432 Homework 2 Solution"
+date: "Assigned: Aug 29, 2022; <span style='color:red'>Due: 11:59 PM CT, Sep 15, 2022</span>"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '2'
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{css, echo=FALSE}
+.solution {
+background-color: #CCDDFF;
+}
+```
+
+## Instruction
+
+```{r}
+library("tidyverse")
+spaceship = read.csv("spaceshiptrain_processed.csv")
+spaceship = as_tibble(spaceship)
+spaceship$Transported = as.factor(spaceship$Transported)
+
+
+```
+```{r}
+# split spaceship into train and testing data
+# 80% train and 20% test
+n = nrow(spaceship)
+train_idx = sample(1:n, 0.8 * n)
+train = spaceship[train_idx, ]
+test = spaceship[-train_idx, ]
+
+```
+```{r}
+test_accuracy = function(model, type = "raw") {
+  preds = as.numeric(predict(model, test, type = type))-1
+  actual = test$Transported
+  mean(preds == actual)
+}
+
+cv = trainControl(method = "cv", number = 5)
+
+```
+
+```{r}
+library(caret)
+# k nearest neighbors
+
+# variable selection
+
+
+knn_tune = expand.grid(
+  k = seq(2, 40, 2)
+)
+
+# model
+knn1_cv1 = train(Transported ~ .,
+                 data = train,
+                 method = "knn", 
+                 trControl = cv,
+                 tuneGrid = knn_tune
+)
+
+# evaluate knn
+test_accuracy(knn1_cv1)
+
+
+```
+
+```{r}
+rfe_ctrl <- rfeControl(functions = rfFuncs, # random forest
+                      method = "repeatedcv", # repeated cv
+                      repeats = 5, # number of repeats
+                      number = 10) # number of folds
+
+x = 
+```
+```{r}
+library(caret)
+# random forest
+rf_model = train(form = Transported ~ .,
+                data = train,
+                method = 'rf',
+                trControl = cv,
+                verbose = FALSE)
+
+# evaluate rf2
+test_accuracy(rf_model)
+
+
+```
+  

@@ -29,6 +29,8 @@ library("tidyverse")
 spaceship = read.csv("spaceshiptrain.csv")
 spaceship = as_tibble(spaceship)
 
+spaceship_test = read.csv("spaceshiptest.csv")
+spaceship_test = as_tibble(spaceship_test)
 ```
 ```{r}
 library("tidyverse")
@@ -176,6 +178,7 @@ spaceship_2 = spaceship %>%
 
 ```
 ```{r}
+set.seed(101)
 library(mice)
 # use mice to fill in spending collumns
 fill_in_spending_nulls_with_mice = function(spaceship) {
@@ -207,12 +210,22 @@ combine_spending_cols = function(spaceship) {
   ) %>%
   remove_cols(c("RoomService", "ShoppingMall", "Spa", "VRDeck", "FoodCourt" ))
 }
-
+```
+```{r}
+# save processed data to csv file.
+change_transported_to_binary = function(spaceship) {
+  spaceship %>% 
+  mutate(
+    Transported = ifelse(Transported=="True",1,0)
+  ) 
+}
+spaceship_2 = spaceship %>% change_transported_to_binary
 ```
 
 ```{r}
 # save processed data to csv file.
-spaceship_processed = spaceship %>% 
+process_data = function(spaceship) {
+  spaceship %>% 
   split_passenger_and_cabin %>%
   add_group_size %>%
   handle_null_planet %>%
@@ -220,9 +233,22 @@ spaceship_processed = spaceship %>%
   fill_nulls_with_mode %>%
   fill_age_with_lm %>%
   fill_in_spending_nulls_with_mice %>%
-  combine_spending_cols
+  combine_spending_cols %>%
+  change_transported_to_binary
+}
+spaceship_processed = spaceship %>% process_data
   
 write.csv(spaceship_processed, "spaceshiptrain_processed.csv", row.names= FALSE)
+
+spaceship_test_processed = spaceship_test %>% process_data
+
+write.csv(spaceship_test_processed, "spaceshiptest_processed.csv", row.names= FALSE)
+
+```
+
+
+```{r}
+
 
 ```
   
