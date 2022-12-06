@@ -202,7 +202,8 @@ fill_in_spending_nulls_with_mice = function(spaceship) {
 combine_spending_cols = function(spaceship) {
   spaceship %>% 
   mutate(
-    TotalSpent = FoodCourt + RoomService + ShoppingMall + Spa + VRDeck
+    LuxuryExpenses = RoomService + Spa + VRDeck,
+    RegularExpenses = FoodCourt + ShoppingMall
   ) %>%
   remove_cols(c("RoomService", "ShoppingMall", "Spa", "VRDeck", "FoodCourt" ))
 }
