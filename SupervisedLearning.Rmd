@@ -28,27 +28,36 @@ background-color: #CCDDFF;
 library("tidyverse")
 spaceship = read.csv("spaceshiptrain_processed.csv")
 spaceship = as_tibble(spaceship)
+spaceship = spaceship %>% convert_char_cols_to_factors
 spaceship$Transported = as.factor(spaceship$Transported)
-
 
 ```
 ```{r}
 # split spaceship into train and testing data
 # 80% train and 20% test
+set.seed(432)
 n = nrow(spaceship)
 train_idx = sample(1:n, 0.8 * n)
 train = spaceship[train_idx, ]
 test = spaceship[-train_idx, ]
 
+x_train = train %>% remove_cols(c("Transported")) # the remove_cols function is in dataProcessing.Rmd
+y_train = train$Transported
+x_test = test %>% remove_cols(c("Transported"))
 ```
 ```{r}
 test_accuracy = function(model, type = "raw") {
-  preds = as.numeric(predict(model, test, type = type))-1
+  preds = predict(model, test, type = type)
   actual = test$Transported
-  mean(preds == actual)
+  # accuracy = mean(preds == actual)
+  # accuracy
+  
+  cf_table = confusionMatrix(data = factor(preds), reference = actual, positive = "True")
+  cf_table
+  
 }
 
-cv = trainControl(method = "cv", number = 5)
+cv = trainControl(method = "repeatedcv", repeats = 3, number = 5)
 
 ```
 
@@ -60,11 +69,11 @@ library(caret)
 
 
 knn_tune = expand.grid(
-  k = seq(2, 40, 2)
+  k = seq(2, 100, 2)
 )
 
 # model
-knn1_cv1 = train(Transported ~ .,
+knn1_cv1 = train(Transported ~ . -VIP -Group_size,
                  data = train,
                  method = "knn", 
                  trControl = cv,
@@ -73,7 +82,11 @@ knn1_cv1 = train(Transported ~ .,
 
 # evaluate knn
 test_accuracy(knn1_cv1)
-
+```
+```{r}
+library(class)
+best_k = 36
+knn.fit = knn(x_train, x_test, y_train, k=best_k)
 
 ```
 
@@ -83,8 +96,6 @@ rfe_ctrl <- rfeControl(functions = rfFuncs, # random forest
                       repeats = 3, # number of repeats
                       number = 5) # number of folds
 
-x_train = train %>% remove_cols(c("Transported")) # the remove_cols function is in dataProcessing.Rmd
-y_train = train$Transported
 ```
 
 ```{r}
@@ -101,36 +112,29 @@ ggplot(data = result_rfe, metric = "Kappa") + theme_bw()
 
 ```{r}
 library(ranger)
-rf_grid = expand.grid(mtry = c(1, 3, 5), splitrule = c("gini"), min.node.size = c(5, 10, 20))
+rf_grid = expand.grid(mtry = c(1, 3, 5, 10), splitrule = c("gini"), min.node.size = c(5, 10, 20))
 
 trcontrol = trainControl(method = "repeatedcv", number = 5, repeats = 3)
 
-models = train(Transported ~ , data = train, method = "ranger", trControl = trcontrol, tuneGrid = rf_grid, num.trees = 300, respect.unordered.factors = "partition")
+models = train(Transported ~ LuxuryExpenses + CryoSleep + Num + Side + Deck + Group_id + RegularExpenses + HomePlanet, data = train, method = "ranger", trControl = trcontrol, tuneGrid = rf_grid, num.trees = 300, respect.unordered.factors = "partition")
 
+summary(models)
 
 ```
+The best 
 
 ```{r}
-library(caret)
-# random forest
-rf_grid = expand.grid(mtry = c(1, 3), splitrule = c("gini"), min.node.size = c(5, 10, 20))
+library(randomForest)
 
-rf_model = train(form = Transported ~ .,
-                data = train,
-                method = 'rf',
-                trControl = cv,
-                tuneGrid = rf_grid,
-                verbose = FALSE,
-                importance = TRUE)
+rf_model = randomForest(Transported ~ ., data = train, mtry = 5, nodesize = 10, importance=TRUE) 
+```
+```{r}
 
-# evaluate rf2
-test_accuracy(rf_model)
-
-
+test_accuracy(rf_model, type = "response")
 ```
 ```{r}
 library(varImp)
-i_scores <- varImp(rf_model$finalModel, conditional=TRUE)
+i_scores <- varImp(rf_model, conditional=TRUE)
 #Gathering rownames in 'var'  and converting it to the factor
 #to provide 'fill' parameter for the bar chart. 
 i_scores <- i_scores %>% tibble::rownames_to_column("var") 
@@ -146,6 +150,73 @@ i_bar <- ggplot(data = i_scores) +
   labs(x = NULL, y = NULL)
 i_bar + coord_polar() + theme_minimal()
 i_bar + coord_flip() + theme_minimal()
+```
+
+```{r}
+library(glmnet)
+x_train2 = model.matrix(~ ., x_train)
+cv.lasso = cv.glmnet(x_train2, y_train, alpha = 1, family = "binomial")
+```
+```{r}
+best_lambda = cv.lasso$lambda.1se
+final_model = glmnet(x_train2, y_train, alpha = 1, family = "binomial", lambda = best_lambda)
+
+
+```
+```{r}
+x_test2 =  model.matrix(~ ., x_test)
+preds = predict(final_model, x_test2, type = "class")
+
+actual = test$Transported
+cf_table = confusionMatrix(data = factor(preds), reference = actual, positive = "True")
+cf_table
+
+
+```
+
+```{r}
+xgb_grid = expand.grid(
+  nrounds = c(1, 10, 100),
+  max_depth = c(1, 4),
+  eta = c(.1, .3),
+  gamma = 0,
+  colsample_bytree = 0.7,
+  min_child_weight = c(1, 3),
+  subsample = c(.8, 1)
+)
+
+#xgb
+xg_model = train(form = Transported ~ . -Group_size -VIP,
+                data = train,
+                method = 'xgbTree', 
+                trControl = cv,
+                verbose = FALSE,
+                tuneGrid = xgb_grid,
+                verbosity = 0)
+# evaluate xg
+test_accuracy(xg_model)
+
+```
+```{r}
+svm_grid = expand.grid(
+  C = seq(1, 1, length = 5),
+  sigma = c(0.01, 0.05)
+
+)
+
+#x
+svm_model = train(form = Transported ~ . -Group_size -VIP,
+                data = train,
+                method = 'svmRadial', 
+                trControl = cv,
+                verbose = FALSE,
+                preProcess = c("center", "scale"),
+                tuneLength = 10,
+                tuneGrid = svm_grid
+                
+                )
+# evaluate xg
+test_accuracy(svm_model)
 
 ```
   
