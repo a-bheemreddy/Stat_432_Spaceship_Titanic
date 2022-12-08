@@ -1,0 +1,84 @@
+---
+title: "UnsupervisedLearning"
+author: "Akaash Kolachina"
+date: "2022-12-07"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#load data
+library("tidyverse")
+library(cluster)
+library(factoextra)
+
+spaceship = read.csv("spaceshiptrain_processed.csv")
+spaceship = as_tibble(spaceship)
+```
+
+## Additional Processing
+```{r}
+# We have to handle our categorical variables before clustering
+# We will implement one-hot encoding 
+library(caret)
+
+dummy = dummyVars(" ~ .", data=spaceship)
+spaceship <- data.frame(predict(dummy, newdata=spaceship))
+```
+
+## K-Means Clustering (Method 1)
+
+```{r}
+# First, we will look at the pca
+library(ggplot2)
+X = scale(spaceship[,!names(spaceship) %in% c("Transported")])
+pca = princomp(X)
+plot_df = data.frame(pc1 = pca$scores[, 1], pc2 = pca$scores[, 2],
+                    Transported = spaceship[,c("Transported")])
+ggplot(plot_df, aes(x=pc1, y=pc2, color = Transported)) +
+  geom_point(size=2)
+```
+```{r}
+# Use elbow method to determine number of clusters to use
+fviz_nbclust(X, kmeans, method = "wss")
+```
+
+There is an elbow at $k = 4$ so we will use 4 clusters.
+
+```{r}
+set.seed(1)
+kmeans = kmeans(spaceship[,!names(spaceship) %in% c("Transported")], centers = 4, nstart = 20)
+table(kmeans$cluster,spaceship$Transported)
+```
+
+## Hierarchical Clustering (Method 2)
+```{r}
+dist = dist(scale(spaceship[,!names(spaceship) %in% c("Transported")]))
+hc_complete = hclust(dist, method = "complete")
+hc_single = hclust(dist, method = "single")
+hc_average = hclust(dist, method = "average")
+```
+```{r}
+cluster_complete = cutree(hc_complete, 4)
+print(table(cluster_complete, spaceship$Transported))
+cluster_single = cutree(hc_single, 4)
+print(table(cluster_single, spaceship$Transported))
+cluster_average = cutree(hc_average, 4)
+print(table(cluster_average, spaceship$Transported))
+```
+
+## Model-based Clustering
+```{r}
+library(mclust)
+
+#read back original data
+spaceship = read.csv("spaceshiptrain_processed.csv")
+spaceship = as_tibble(spaceship)
+
+mc = Mclust(spaceship[,!names(spaceship) %in% c("Transported")])
+print(table(mc$classification, spaceship$Transported))
+```
+
