@@ -175,6 +175,7 @@ cf_table
 ```
 
 ```{r}
+library(caret)
 xgb_grid = expand.grid(
   nrounds = c(1, 10, 100),
   max_depth = c(1, 4),
@@ -186,18 +187,19 @@ xgb_grid = expand.grid(
 )
 
 #xgb
-xg_model = train(form = Transported ~ . -Group_size -VIP,
+xg_model2 = train(form = Transported ~ . -Group_size -VIP,
                 data = train,
                 method = 'xgbTree', 
                 trControl = cv,
                 verbose = FALSE,
                 tuneGrid = xgb_grid,
-                verbosity = 0)
+                verbosity = 0) 
 # evaluate xg
-test_accuracy(xg_model)
+test_accuracy(xg_model2)
 
 ```
 ```{r}
+library(caret)
 svm_grid = expand.grid(
   C = seq(1, 1, length = 5),
   sigma = c(0.01, 0.05)
@@ -205,7 +207,7 @@ svm_grid = expand.grid(
 )
 
 #x
-svm_model = train(form = Transported ~ . -Group_size -VIP,
+svm_model = train(form = Transported ~ . -VIP,
                 data = train,
                 method = 'svmRadial', 
                 trControl = cv,
@@ -219,4 +221,38 @@ svm_model = train(form = Transported ~ . -Group_size -VIP,
 test_accuracy(svm_model)
 
 ```
-  
+```{r}
+# train xgb model on entire dataset
+#xgb
+xg_model = train(form = Transported ~ . -Group_size -VIP,
+                data = spaceship,
+                method = 'xgbTree', 
+                trControl = cv,
+                verbose = FALSE,
+                tuneGrid = xgb_grid,
+                verbosity = 0) 
+# evaluate xg
+test_accuracy(xg_model)
+```
+
+```{r}
+# predict with best model(xg_model)
+contest_test = read.csv("spaceshiptest_processed.csv")
+contest_test = contest_test %>% convert_char_cols_to_factors
+original_test = read.csv("spaceshiptest.csv")
+```
+```{r}
+
+preds = predict(xg_model, contest_test, type = "raw")
+```
+
+```{r}
+contest_results = original_test %>% 
+  mutate(
+    Transported = preds
+  ) %>%
+  select(PassengerId, Transported)
+```
+```{r}
+write.csv(contest_results, "contest_results.csv", row.names= FALSE)
+```

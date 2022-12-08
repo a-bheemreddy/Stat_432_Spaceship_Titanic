@@ -44,7 +44,7 @@ split_passenger_id = function(spaceship) {
 
 remove_cols = function(spaceship, names) {
   spaceship = spaceship %>% 
-    select(-one_of(names)) %>% drop_na
+    select(-one_of(names)) 
 }
 
 
@@ -166,6 +166,11 @@ fill_age_with_lm = function(spaceship) {
   # add predicted age instead of null values.
   spaceship_age_na = spaceship %>% filter(is.na(Age))
   spaceship$Age[is.na(spaceship$Age)] = predict(model, spaceship_age_na)
+  
+  model2 = lm(Num ~ VIP + Group_size + HomePlanet + Destination + Deck + Side, data = spaceship)
+  # add predicted age instead of null values.
+  spaceship_num_na = spaceship %>% filter(is.na(Num))
+  spaceship$Num[is.na(spaceship$Num)] = predict(model, spaceship_num_na)
   spaceship
 }
 
@@ -252,6 +257,41 @@ spaceship_test_processed = spaceship_test %>% process_data
 write.csv(spaceship_test_processed, "spaceshiptest_processed.csv", row.names= FALSE)
 
 ```
+
+```{r}
+library(ggplot2)
+plot_variables = function(df) {
+  variables = names(df)
+  lapply(variables, function(var) ggplot(df, aes(x=var)) + stat_count(width = 0.5))
+  
+}
+spaceship_processed %>% plot_variables
+```
+
+```{r}
+library(Hmisc)
+hist.data.frame(spaceship_processed)
+```
+
+```{r}
+# save processed data to csv file.
+process_data_2 = function(spaceship) {
+  spaceship %>% 
+  split_passenger_and_cabin %>%
+  add_group_size %>%
+  handle_null_planet %>%
+  handle_cryo_sleep %>%
+  fill_nulls_with_mode %>%
+  fill_age_with_lm %>%
+  fill_in_spending_nulls_with_mice %>%
+  combine_spending_cols
+}
+
+spaceship_2 = spaceship %>% process_data_2
+
+
+```
+
 
 
 
